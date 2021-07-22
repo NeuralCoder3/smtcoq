@@ -21,3 +21,4 @@ val checker_debug : string -> string -> unit
 val theorem : CoqInterface.id -> string -> string -> unit
 val tactic : EConstr.t -> CoqInterface.constr_expr list -> CoqInterface.tactic
 val tactic_no_check : EConstr.t -> CoqInterface.constr_expr list -> CoqInterface.tactic
+val export_bool : CoqInterface.globRef -> string -> unit

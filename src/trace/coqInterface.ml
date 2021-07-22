@@ -14,6 +14,7 @@
 type id = Names.variable
 let mkId = Names.Id.of_string
 
+type globRef = Names.GlobRef.t
 
 type name = Names.Name.t
 let name_of_id i = Names.Name i

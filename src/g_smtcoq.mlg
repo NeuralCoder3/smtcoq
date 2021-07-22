@@ -53,6 +53,10 @@ VERNAC COMMAND EXTEND Vernac_verit CLASSIFIED AS QUERY
   {
     Verit.theorem name fsmt fproof
   }
+| [ "Verit_Export_Bool" reference(name) string(fsmt)  ] ->
+  {
+    Verit.export_bool (Nametab.global name) fsmt
+  }
 END
 
 VERNAC COMMAND EXTEND Vernac_lfsc CLASSIFIED AS QUERY

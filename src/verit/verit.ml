@@ -238,3 +238,41 @@ let tactic_gen vm_cast lcpl lcepl =
   SmtCommands.tactic call_verit verit_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl
 let tactic = tactic_gen vm_cast_true
 let tactic_no_check = tactic_gen (fun _ -> vm_cast_true_no_check)
+
+
+let export_bool name fsmt =
+  let open Names.GlobRef in
+  match name with
+  | VarRef _ ->
+    CoqInterface.error("variables are not covered in this example")
+  | IndRef _ ->
+    CoqInterface.error( "inductive types are not covered in this example")
+  | ConstructRef _ ->
+    CoqInterface.error( "constructors are not covered in this example")
+  | ConstRef cst ->
+    let cb = Environ.lookup_constant cst (Global.env()) in
+    match Global.body_of_constant_body Library.indirect_accessor cb with
+    | Some(e, _, _) ->
+
+      let env = Global.env () in
+      let sigma = Evd.from_env env in
+      (* let t = EConstr.of_constr e in *)
+      (* Feedback.msg_warning(Printer.pr_econstr_env env sigma (t)) *)
+
+      let t = e in
+
+      let outchan = open_out fsmt in
+
+      let rt = SmtBtype.create () in
+      let ro = Op.create () in
+      let ra = VeritSyntax.ra in
+      let rf = VeritSyntax.rf in
+      let lsmt = [Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t] in
+      export outchan rt ro lsmt;
+
+      (* let fmt = Format.formatter_of_out_channel outchan in *)
+      (* Format.fprintf fmt "(check-sat)\n(exit)@."; *)
+      close_out outchan;
+
+      ()
+    | None -> CoqInterface.error( "This term has no value")

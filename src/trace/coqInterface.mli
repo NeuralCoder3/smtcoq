@@ -17,6 +17,8 @@
 type id = Names.variable
 val mkId : string -> id
 
+type globRef = Names.GlobRef.t
+
 type name
 val name_of_id : id -> name
 val mkName : string -> name
