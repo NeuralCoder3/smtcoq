@@ -267,7 +267,29 @@ let export_bool name fsmt =
       let ro = Op.create () in
       let ra = VeritSyntax.ra in
       let rf = VeritSyntax.rf in
-      let lsmt = [Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t] in
+      (* let lsmt = [] in *)
+
+      let lsmt = [
+        (* Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t *)
+        (* mklApp cFxor (Array.map Lazy.force [|cFtrue;cFfalse|]) *)
+        (* cFtrue *)
+        (* SmtForm.Ftrue *)
+        (* Form.of_coq (Atom.get ra) rf (cFtrue) *)
+
+
+
+
+(* working *)
+        (* Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf 
+          (Lazy.force ctrue) *)
+
+        (* Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf 
+          ( mklApp cxorb (Array.map Lazy.force [|ctrue;cfalse|]) ) *)
+
+(* working: bool -> formula
+example: xorb true false *)
+        Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t
+      ] in
       export outchan rt ro lsmt;
 
       (* let fmt = Format.formatter_of_out_channel outchan in *)
@@ -276,3 +298,89 @@ let export_bool name fsmt =
 
       ()
     | None -> CoqInterface.error( "This term has no value")
+
+
+
+let run_verit filename logfilename =
+  let wname = Filename.chop_extension filename ^ ".log" in
+  let woc = open_out wname in
+  close_out woc;
+  let command = "veriT --proof-prune --proof-merge --proof-with-sharing --cnf-definitional --disable-ackermann --input=smtlib2 --proof=" ^ logfilename ^ " " ^ filename ^ " 2> " ^ wname in
+  Format.eprintf "%s@." command;
+  let t0 = Sys.time () in
+  let exit_code = Sys.command command in
+  let t1 = Sys.time () in
+  Format.eprintf "Verit = %.5f@." (t1-.t0);
+
+  let win = open_in wname in
+
+  let raise_warnings_errors () =
+    try
+      while true do
+        let l = input_line win in
+        let n = String.length l in
+        if l = "warning : proof_done: status is still open" then
+          raise Unknown
+        else if l = "Invalid memory reference" then
+          CoqInterface.warning "verit-warning" ("veriT outputted the warning: " ^ l)
+        else if n >= 7 && String.sub l 0 7 = "warning" then
+          CoqInterface.warning "verit-warning" ("veriT outputted the warning: " ^ (String.sub l 7 (n-7)))
+        else if n >= 8 && String.sub l 0 8 = "error : " then
+          CoqInterface.error ("veriT failed with the error: " ^ (String.sub l 8 (n-8)))
+        else
+          CoqInterface.error ("veriT failed with the error: " ^ l)
+      done
+    with End_of_file -> () in
+
+  try
+    if exit_code <> 0 then CoqInterface.warning "verit-non-zero-exit-code" ("Verit.call_verit: command " ^ command ^ " exited with code " ^ string_of_int exit_code);
+    raise_warnings_errors ();
+    (* let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in *)
+    close_in win; 
+    ()
+    (* Sys.remove wname; res *)
+  with x -> close_in win; 
+  (* Sys.remove wname; *)
+            match x with
+            | Unknown -> CoqInterface.error "veriT returns 'unknown'"
+            | VeritSyntax.Sat -> CoqInterface.error "veriT found a counter-example"
+            | _ -> raise x
+
+
+
+let import_bool name smt fsmt fproof =
+  let rt = SmtBtype.create () in
+  let ro = Op.create () in
+  let ra = VeritSyntax.ra in
+  let rf = VeritSyntax.rf in
+  let ra_quant = VeritSyntax.ra_quant in
+  let rf_quant = VeritSyntax.rf_quant in
+
+  let open Names.GlobRef in
+  match smt with
+  | VarRef _ ->
+    CoqInterface.error("variables are not covered in this example")
+  | IndRef _ ->
+    CoqInterface.error( "inductive types are not covered in this example")
+  | ConstructRef _ ->
+    CoqInterface.error( "constructors are not covered in this example")
+  | ConstRef cst ->
+    let cb = Environ.lookup_constant cst (Global.env()) in
+    match Global.body_of_constant_body Library.indirect_accessor cb with
+    | None -> CoqInterface.error( "This term has no value")
+    | Some(e, _, _) ->
+
+      let env = Global.env () in
+      let sigma = Evd.from_env env in
+
+      let t = e in
+
+      let lsmt = Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t in
+      let first = lsmt in
+      let root = SmtTrace.mkRootV [first] in (* Form.neg *)
+      let roots = Smtlib2_genConstr.import_smtlib2 rt ro ra rf fsmt in
+
+      let (max_id, confl) = import_trace ra_quant rf_quant fproof (Some (root,first)) [lsmt] in
+  (* let (max_id, confl) = import_trace ra_quant rf_quant fproof None [] in *)
+  (* let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in *)
+      SmtCommands.theorem name (rt, ro, ra, rf, roots, max_id, confl)

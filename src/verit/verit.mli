@@ -22,3 +22,5 @@ val theorem : CoqInterface.id -> string -> string -> unit
 val tactic : EConstr.t -> CoqInterface.constr_expr list -> CoqInterface.tactic
 val tactic_no_check : EConstr.t -> CoqInterface.constr_expr list -> CoqInterface.tactic
 val export_bool : CoqInterface.globRef -> string -> unit
+val run_verit : string -> string -> unit
+val import_bool : CoqInterface.id -> CoqInterface.globRef -> string -> string -> unit
