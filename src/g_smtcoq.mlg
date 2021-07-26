@@ -57,6 +57,14 @@ VERNAC COMMAND EXTEND Vernac_verit CLASSIFIED AS QUERY
   {
     Verit.export_bool (Nametab.global name) fsmt
   }
+| [ "Verit_Run" string(fsmt) string(log)  ] ->
+  {
+    Verit.run_verit fsmt log
+  }
+| [ "Verit_Import_Bool" ident(name) reference(smt) string(fsmt) string(fproof) ] ->
+  {
+    Verit.import_bool name (Nametab.global smt) fsmt fproof
+  }
 END
 
 VERNAC COMMAND EXTEND Vernac_lfsc CLASSIFIED AS QUERY
