@@ -79,6 +79,8 @@ module type FORM =
       (** Given a coq term, build the corresponding formula *)
       val of_coq : (CoqInterface.constr -> hatom) -> reify -> CoqInterface.constr -> t
 
+      val of_coq_form : (CoqInterface.constr -> hatom) -> reify -> CoqInterface.constr -> t
+
       val hash_hform : (hatom -> hatom) -> reify -> t -> t
 
       (** Flattening of [Fand] and [For], removing of [Fnot2]  *)
@@ -104,6 +106,9 @@ module type FORM =
       val interp_to_coq :
 	  (hatom -> CoqInterface.constr) -> (int, CoqInterface.constr) Hashtbl.t ->
 	    t -> CoqInterface.constr
+
+      (* val pf_to_coq : (hatom, t) gen_pform -> CoqInterface.constr *)
+      val pf_to_coq : pform -> CoqInterface.constr
 
       (* Unstratified terms *)
       type atom_form_lit =
