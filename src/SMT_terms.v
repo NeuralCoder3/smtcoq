@@ -20,6 +20,29 @@ Local Open Scope int63_scope.
 
 #[export] Hint Unfold is_true : smtcoq_core.
 
+(*
+  Representation of formulas
+  Formulas do not exist on their own
+  but only in arrays with hash indices (t_form)
+  together with an array of atoms (t_atom)
+  an array of variables (t_func)
+  and a base (t_i)
+
+  This Coq form type is only used for imported traces/certificates
+  to represent the proof of a statement back in Coq
+
+  The type is similar to the OCaml form type(s)
+
+
+  This file contains definitions for form and atom,
+  the interpretation and lemmas
+
+  a form is built from atoms and boolean connectives
+  atoms are operator applications to literals
+  negation is no operator but expressed by 2n (no negation)
+  or 2n+1 acess to the array
+*)
+
 
 (* Remark: I use Notation instead of Definition du eliminate conversion check during the type checking *)
 Notation atom := int (only parsing).
@@ -27,6 +50,8 @@ Notation atom := int (only parsing).
 Module Form.
 
   Notation fargs := (array _lit) (only parsing).
+
+  (* _lit = int *)
 
   Inductive form : Type :=
   | Fatom (_:atom)
@@ -65,6 +90,10 @@ Module Form.
   Section Interp.
     Variable interp_atom : atom -> bool.
     Variable interp_bvatom : atom -> forall s, BITVECTOR_LIST.bitvector s.
+
+    (* About Lit.interp.
+    Print Valuation.t.
+    Print Lit.interp. *)
 
     Section Interp_form.
 

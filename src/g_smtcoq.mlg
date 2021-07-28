@@ -10,6 +10,12 @@
 (**************************************************************************)
 
 
+(*
+this file declares all vernaculars (top-level commands)
+and OCaml tactics
+*)
+
+
 DECLARE PLUGIN "smtcoq_plugin"
 
 {
@@ -35,6 +41,13 @@ VERNAC COMMAND EXTEND Vernac_zchaff CLASSIFIED AS QUERY
   }
 END
 
+(*
+Vernaculars for the verit prover
+here are also the custom commands
+
+reference and Nametab.global name are used to identify
+a definition given by name
+*)
 VERNAC COMMAND EXTEND Vernac_verit CLASSIFIED AS QUERY
 | [ "Parse_certif_verit"
     ident(t_i) ident(t_func) ident(t_atom) ident(t_form) ident(root) ident(used_roots) ident(trace) string(fsmt) string(fproof) ] ->
@@ -92,6 +105,10 @@ TACTIC EXTEND Tactic_zchaff
 | [ "zchaff_bool_no_check" ] -> { Zchaff.tactic_no_check () }
 END
 
+(*
+custom functions to collect and add lemmas
+TODO: where is this used what exactly are these lemmas
+*)
 {
 
 let lemmas_list = Summary.ref ~name:"Selected lemmas" []
@@ -123,7 +140,11 @@ VERNAC COMMAND EXTEND Add_lemma CLASSIFIED AS SIDEFF
 | [ "Clear_lemmas" ] -> { clear_lemmas () }
 END
 
-
+(*
+Tactic for verit
+verit_bool_base takes as argument the collect hypotheses
+as option of tuple of hypotheses
+*)
 TACTIC EXTEND Tactic_verit
 | [ "verit_bool_base" constr(lpl) ] -> { Verit.tactic lpl (get_lemmas ()) }
 | [ "verit_bool_no_check_base" constr(lpl) ] -> { Verit.tactic_no_check lpl (get_lemmas ()) }

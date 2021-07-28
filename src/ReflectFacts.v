@@ -9,6 +9,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(*
+Reflection of boolean and propositional logic
+to enable propositional reasoning
+*)
+
 
 Require Import
         Bool ZArith BVList Logic.

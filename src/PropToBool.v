@@ -9,6 +9,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(*
+Tranform a propositional goal into a boolean one
+suited for automated reasoning using smt solvers
+
+the tactics basically try all rewrites
+
+also contains some tests
+*)
+
 
 Require Import
         Bool ZArith BVList Logic BVList FArray
