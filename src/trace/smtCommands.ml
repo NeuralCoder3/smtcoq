@@ -733,6 +733,54 @@ let of_coq_lemma rt ro ra_quant rf_quant env sigma solver_logic clemma =
           | Some core_smt -> Some (Form.get rf_quant (Fapp (Fforall forall_args, [|core_smt|])))
           | None -> None)
 
+
+(* let core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl env sigma concl =
+  let a, b = get_arguments concl in
+
+  let tlcepl = List.map (CoqInterface.interp_constr env sigma) lcepl in
+  let lcpl = lcpl @ tlcepl in
+
+  let create_lemma l =
+    let cl = CoqInterface.retyping_get_type_of env sigma l in
+    match of_coq_lemma rt ro ra_quant rf_quant env sigma solver_logic cl with
+      | Some smt -> Some ((cl, l), smt)
+      | None -> None
+  in
+  let l_pl_ls = SmtMisc.filter_map create_lemma lcpl in
+  let lsmt = List.map snd l_pl_ls in
+
+  let lem_tbl : (int, CoqInterface.constr * CoqInterface.constr) Hashtbl.t =
+    Hashtbl.create 100 in
+  let new_ref ((l, pl), ls) =
+    Hashtbl.add lem_tbl (Form.index ls) (l, pl) in
+
+  List.iter new_ref l_pl_ls;
+
+  let find_lemma cl =
+    let re_hash hf = Form.hash_hform (Atom.hash_hatom ra_quant) rf_quant hf in
+    match cl.value with
+    | Some [l] ->
+       let hl = re_hash l in
+       begin try Hashtbl.find lem_tbl (Form.index hl)
+             with Not_found ->
+               let oc = open_out "/tmp/find_lemma.log" in
+               let fmt = Format.formatter_of_out_channel oc in
+               List.iter (fun u -> Format.fprintf fmt "%a\n" (Form.to_smt ~debug:true) u) lsmt;
+               Format.fprintf fmt "\n%a\n" (Form.to_smt ~debug:true) hl;
+               flush oc; close_out oc; failwith "find_lemma" end
+      | _ -> failwith "unexpected form of root" in
+
+  let (body_cast, body_nocast, cuts) =
+      let l = Form.of_coq (Atom.of_coq rt ro ra solver_logic env sigma) rf a in
+      let _ = Form.of_coq (Atom.of_coq ~eqsym:true rt ro ra_quant solver_logic env sigma) rf_quant a in
+      let nl = if (CoqInterface.eq_constr b (Lazy.force ctrue)) then Form.neg l else l in
+      let lsmt = Form.flatten rf nl :: lsmt in
+      let max_id_confl = make_proof call_solver env rt ro ra_quant rf_quant nl lsmt in
+      build_body rt ro ra rf (Form.to_coq l) b max_id_confl (vm_cast env) (Some find_lemma)
+  in
+  body_cast *)
+
+
 let core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl env sigma concl =
   let a, b = get_arguments concl in
 

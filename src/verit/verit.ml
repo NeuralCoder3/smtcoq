@@ -384,3 +384,39 @@ let import_bool name smt fsmt fproof =
   (* let (max_id, confl) = import_trace ra_quant rf_quant fproof None [] in *)
   (* let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in *)
       SmtCommands.theorem name (rt, ro, ra, rf, roots, max_id, confl)
+
+
+      (* let forward _ rt ro ra_quant rf_quant first lsmt =
+          import_trace ra_quant rf_quant fproof (Some first) lsmt
+          (* (max_id,confl) *)
+      in *)
+      
+      (* SmtCommands.tactic forward 
+        verit_logic rt ro ra rf ra_quant rf_quant vm_cast_true [t] [] *)
+      ;()
+      (* SmtCommands.core_tactic forward 
+        verit_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl env sigma concl = *)
+
+      (* let find_lemma cl =
+        let re_hash hf = Form.hash_hform (Atom.hash_hatom ra_quant) rf_quant hf in
+        match cl.value with
+        | Some [l] ->
+          let hl = re_hash l in
+          begin try Hashtbl.find lem_tbl (Form.index hl)
+                with Not_found ->
+                  let oc = open_out "/tmp/find_lemma.log" in
+                  let fmt = Format.formatter_of_out_channel oc in
+                  List.iter (fun u -> Format.fprintf fmt "%a\n" (Form.to_smt ~debug:true) u) lsmt;
+                  Format.fprintf fmt "\n%a\n" (Form.to_smt ~debug:true) hl;
+                  flush oc; close_out oc; failwith "find_lemma" end
+          | _ -> failwith "unexpected form of root" in
+
+      (* let l = Form.of_coq (Atom.of_coq rt ro ra solver_logic env sigma) rf a in *)
+      (* let _ = Form.of_coq (Atom.of_coq ~eqsym:true rt ro ra_quant solver_logic env sigma) rf_quant a in *)
+      let l = lsmt in
+      (* let nl = if (CoqInterface.eq_constr b (Lazy.force ctrue)) then Form.neg l else l in *)
+      let nl = Form.neg l in
+      let lsmt2 = Form.flatten rf nl :: lsmt in
+      (* let max_id_confl = make_proof call_solver env rt ro ra_quant rf_quant nl lsmt in *)
+      let max_id_confl = (max_id,confl) in
+      SmtCommands.build_body rt ro ra rf (Form.to_coq l) b max_id_confl (vm_cast env) (Some find_lemma) *)
