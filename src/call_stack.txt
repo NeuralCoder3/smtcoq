@@ -1,0 +1,36 @@
+tactic_gen 
+  SmtCommands.tactic call_verit verit_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl
+
+call_verit
+    let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in
+
+let theorem name fsmt fproof =
+  SmtCommands.theorem name (import_all fsmt fproof)
+
+import_all
+  let roots = Smtlib2_genConstr.import_smtlib2 rt ro ra rf fsmt in
+  let (max_id, confl) = import_trace ra_quant rf_quant fproof None [] in
+  (rt, ro, ra, rf, roots, max_id, confl)
+
+
+
+
+
+let theorem name (rt, ro, ra, rf, roots, max_id, confl) =
+  let t_func = make_t_func ro (v 1 (*t_i*)) in
+  CoqInterface.mkLetIn (ntfunc, t_func, mklApp carray [|mklApp ctval [|v 1(* t_i *)|]|],
+
+  creates theorem, return unit
+
+
+let core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl env sigma concl =
+      let l = Form.of_coq (Atom.of_coq rt ro ra solver_logic env sigma) rf a in
+      let _ = Form.of_coq (Atom.of_coq ~eqsym:true rt ro ra_quant solver_logic env sigma) rf_quant a in
+      let nl = if (CoqInterface.eq_constr b (Lazy.force ctrue)) then Form.neg l else l in
+      let lsmt = Form.flatten rf nl :: lsmt in
+        let max_id_confl = make_proof call_solver env rt ro ra_quant rf_quant nl lsmt in
+      build_body rt ro ra rf (Form.to_coq l) b max_id_confl (vm_cast env) (Some find_lemma)
+
+
+let build_body rt ro ra rf l b (max_id, confl) vm_cast find =
+  let t_func = CoqInterface.lift 1 (make_t_func ro (v 0 (*t_i - 1*))) in
