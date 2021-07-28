@@ -16,7 +16,7 @@
 * if one locally modified Coq files, the .vo* files need to be deleted for a fresh recompilation with correct prefixes
 * the tools (especially veriT) need to be installed and in the path
     as described in the installation instructions
-* 
+* the Coq files mentioned below have more information in their headers
 
 
 # Short Overview
@@ -27,12 +27,12 @@
 * PropToBool.v tactics to move prop to bool (and back)
 * ReflectFacts.v theorems used by PropToBool
 * SMT_terms.v definition, interpretation, and lemmas for Coq form and atom
-* classes
+* classes/
   * SMT_classes.v definition of used type classes
   * SMT_classes_instances.v theirs instances registered in SMTCoq
-* array
+* array/
   * FArray.v functional arrays for smt2
-* Array
+* Array/
   * PArray.v arrays based on finite maps using AVL trees (used in the Coq part)
-* bva
+* bva/
   * BVList.v Bit vectors and their operations
