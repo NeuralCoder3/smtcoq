@@ -82,7 +82,6 @@ module type FORM =
 
     (** Given a coq term, build the corresponding formula *)
     val of_coq : (CoqInterface.constr -> hatom) -> reify -> CoqInterface.constr -> t
-    val of_coq_form : (CoqInterface.constr -> hatom) -> reify -> CoqInterface.constr -> t
 
     val hash_hform : (hatom -> hatom) -> reify -> t -> t
     (* Flattening of [Fand] and [For], removing of [Fnot2]  *)
@@ -478,105 +477,6 @@ module Make (Atom:ATOM) =
 
 
 
-
-    let op_tbl_form () =
-      let tbl = ConstrHashtbl.create 29 in
-      let add (c1,c2) = ConstrHashtbl.add tbl (Lazy.force c1) c2 in
-      List.iter add
-	[
-	  cFtrue,CCtrue; cFfalse,CCfalse;
-	  cFand,CCand; cFor,CCor; cFxor,CCxor; cFimp,CCimp; 
-    (* cnegb,CCnot; *)
-          cFiff,CCiff; cFite,CCifb ];
-          (* cFbbt? *)
-      tbl
-
-    let op_tbl_form = lazy (op_tbl_form ())
-
-    (* let empty_args_form = [||] *)
-
-    let of_coq_form atom_of_coq_form reify c =
-      let op_tbl = Lazy.force op_tbl_form in
-      let get_cst c =
-        try ConstrHashtbl.find op_tbl c with Not_found -> CCunknown in
-      let rec mk_hform h =
-        let c, args = CoqInterface.decompose_app h in
-        match get_cst c with
-          | CCtrue  -> get reify (Fapp(Ftrue,empty_args))
-          | CCfalse -> get reify (Fapp(Ffalse,empty_args))
-          | CCnot -> mk_fnot 1 args (* can not occur *)
-          | CCand -> mk_fand [] args
-          | CCor  -> mk_for [] args
-          | CCxor -> op2 (fun l -> Fapp(Fxor,l)) args
-          | CCiff -> op2 (fun l -> Fapp(Fiff,l)) args
-          | CCimp ->
-             (match args with
-                | [b1;b2] ->
-                   let l1 = mk_hform b1 in
-                   let l2 = mk_hform b2 in
-                   get reify (Fapp (Fimp, [|l1;l2|]))
-                | _ -> CoqInterface.error "SmtForm.Form.of_coq_form: wrong number of arguments for implb")
-          | CCifb ->
-             (* We should also be able to reify if then else *)
-             begin match args with
-               | [b1;b2;b3] ->
-                  let l1 = mk_hform b1 in
-                  let l2 = mk_hform b2 in
-                  let l3 = mk_hform b3 in
-                  get reify (Fapp (Fite, [|l1;l2;l3|]))
-               | _ -> CoqInterface.error "SmtForm.Form.of_coq_form: wrong number of arguments for ifb"
-             end
-          | _ ->
-             let a = atom_of_coq_form h in
-             get reify (Fatom a)
-
-      and op2 f args =
-        match args with
-          | [b1;b2] ->
-             let l1 = mk_hform b1 in
-             let l2 = mk_hform b2 in
-             get reify (f [|l1; l2|])
-          | _ ->  CoqInterface.error "SmtForm.Form.of_coq_form: wrong number of arguments"
-
-      and mk_fnot i args =
-        match args with
-          | [t] ->
-             let c,args = CoqInterface.decompose_app t in
-             if CoqInterface.eq_constr c (Lazy.force cnegb) then
-               mk_fnot (i+1) args
-             else
-               let q,r = i lsr 1 , i land 1 in
-               let l = mk_hform t in
-               let l = if r = 0 then l else neg l in
-               if q = 0 then l
-               else get reify (Fapp(Fnot2 q, [|l|]))
-          | _ -> CoqInterface.error "SmtForm.Form.mk_hform: wrong number of arguments for negb"
-
-      and mk_fand acc args =
-        match args with
-          | [t1;t2] ->
-             let l2 = mk_hform t2 in
-             let c, args = CoqInterface.decompose_app t1 in
-             if CoqInterface.eq_constr c (Lazy.force candb) then
-               mk_fand (l2::acc) args
-             else
-               let l1 = mk_hform t1 in
-               get reify (Fapp(Fand, Array.of_list (l1::l2::acc)))
-          | _ -> CoqInterface.error "SmtForm.Form.mk_hform: wrong number of arguments for andb"
-
-      and mk_for acc args =
-        match args with
-          | [t1;t2] ->
-             let l2 = mk_hform t2 in
-             let c, args = CoqInterface.decompose_app t1 in
-             if CoqInterface.eq_constr c (Lazy.force corb) then
-               mk_for (l2::acc) args
-             else
-               let l1 = mk_hform t1 in
-               get reify (Fapp(For, Array.of_list (l1::l2::acc)))
-          | _ -> CoqInterface.error "SmtForm.Form.mk_hform: wrong number of arguments for orb" in
-
-      mk_hform c
 
 
 

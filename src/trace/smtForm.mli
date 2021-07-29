@@ -79,7 +79,6 @@ module type FORM =
       (** Given a coq term, build the corresponding formula *)
       val of_coq : (CoqInterface.constr -> hatom) -> reify -> CoqInterface.constr -> t
 
-      val of_coq_form : (CoqInterface.constr -> hatom) -> reify -> CoqInterface.constr -> t
 
       val hash_hform : (hatom -> hatom) -> reify -> t -> t
 
