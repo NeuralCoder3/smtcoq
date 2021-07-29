@@ -42,7 +42,10 @@ val checker_debug : string -> string -> unit
 val theorem : CoqInterface.id -> string -> string -> unit
 (* verit_bool_base tactic
     first argument are hypotheses (option of tuple)
-    second is get_lemmas() => (old lemmas? and) goal? TODO
+    second is get_lemmas() => old lemmas?
+
+    the environment and goal (conclusion) is added
+      at SmtCommands.core_tactic using mk_tactic (in CoqInterface)
 
     generates default arguments (rt, ro, ra, rf, ...)
     calls SmtCommands.tactic and forwards call_verit
@@ -96,6 +99,12 @@ val run_verit : string -> string -> unit
     attempts:
       rebuild the functions or important parts thereof 
       namely replicate build_body from SmtCommands
+    idea:
+      use like theorem but add environment like core_tactic uses
+      env and sigma =>
+      ro is extended by Op.declare in Atom.of_coq
+        which is used in Form.of_coq in core_tactic
+        before calls to build_body
 
     (see call_stack.txt in parent directory for important call traces)
 
