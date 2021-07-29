@@ -9,6 +9,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(*
+  definition of atoms and operators
+  some important functions are the of_coq functions
+*)
+
 
 open SmtBtype
 

@@ -9,6 +9,25 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(*
+parts of ATOM
+and complete code for FORM
+one important function is of_coq 
+  which converts a bool to OCaml Form
+some type schemes are:
+
+gen_hashed = {index:int, hval:'a}
+hatom = Atom.t
+gen_pform (a,f) = Fatom a | Fapp op*f array | Fbbt a*f list
+pform = (Atom.t,t) gen_pform
+hpform = pform gen_hashed
+t = Pos hpform | Neg hpform
+
+literals: pos -> 2*index, neg -> 2*index+1
+
+summary: forms are nested arrays with operations, atoms, and literals
+  the access is carried out with hashed indices
+*)
 
 open SmtMisc
 

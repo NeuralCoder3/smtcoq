@@ -10,6 +10,13 @@
 (**************************************************************************)
 
 
+(*
+  interface to access Coq frameword functions
+  like making applications, let-in, ... to build terms
+  also contains functions to build tactics and to warn/inform/throw errors
+*)
+
+
 (* WARNING: currently, we map all the econstr into constr: we suppose
    that the goal does not contain existencial variables *)
 

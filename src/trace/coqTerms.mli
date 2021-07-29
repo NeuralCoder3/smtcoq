@@ -10,6 +10,15 @@
 (**************************************************************************)
 
 
+(*
+    definitions to easily access Coq definitions
+    each needed coq term has a defintion c[Name]
+
+    all constr are lazy: they need to be forced used Lazy.force
+*)
+
+
+
 val gen_constant : string list list -> string -> CoqInterface.constr lazy_t
 
 (* Int63 *)

@@ -9,6 +9,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(*
+  not to be confused with smtAtom
+*)
+
 
 module Atom : sig
   type t = int
