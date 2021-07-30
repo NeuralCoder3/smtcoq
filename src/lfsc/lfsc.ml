@@ -344,7 +344,13 @@ let string_logic ro f =
     (if SL.mem LBitvectors l then "BV" else "")
     (if SL.mem LLia l then "LIA" else "")
 
-
+(* exception ModelException of SmtCommands.model_type *)
+exception ModelException of
+    (Environ.env * SmtBtype.reify_tbl * 
+    SmtAtom.Op.reify_tbl *
+    SmtAtom.Atom.reify_tbl *
+    SmtAtom.Form.reify *
+    SExpr.t)
 
 let call_cvc4 env rt ro ra rf root _ =
   let open Smtlib2_solver in
@@ -392,9 +398,13 @@ let call_cvc4 env rt ro ra rf root _ =
       end
     | Sat ->
       let smodel = get_model cvc4 in
-      CoqInterface.error
+      (* CoqInterface.error
         ("CVC4 returned sat. Here is the model:\n\n" ^
-         SmtCommands.model_string env rt ro ra rf smodel)
+         SmtCommands.model_string env rt ro ra rf smodel) *)
+         (* raise (ModelException (env,rt,ro,ra,rf,smodel)) *)
+         Exninfo.iraise (Exninfo.capture (ModelException (env,rt,ro,ra,rf,smodel)))
+        (* CErrors.user_err (Pp.str "CVC4 model") *)
+        (* Exninfo.iraise (CErrors.UserError (None, Pp.str "CVC4 model"), Exninfo.null) *)
         (* (asprintf "CVC4 returned sat. Here is the model:\n%a" SExpr.print smodel) *)
   in
 
@@ -494,9 +504,33 @@ let tactic_gen vm_cast =
   let rf = Tosmtcoq.rf in
   let ra' = Tosmtcoq.ra in
   let rf' = Tosmtcoq.rf in
-  SmtCommands.tactic call_cvc4 cvc4_logic rt ro ra rf ra' rf' vm_cast [] []
+  CErrors.register_handler (function 
+    | ModelException (env,rt,ro,ra,rf,smodel) -> Some (Pp.str 
+        ("CVC4 returned sat. Here is the model:\n\n" ^
+        SmtCommands.model_string env rt ro ra rf smodel)
+        )
+    | _ -> None
+    (* CoqInterface.error "CVC4: M3" *)
+    );
+  (* try *)
+    (* CoqInterface.warning "lfc-warning" ("cvc outputted no warning."); *)
+    SmtCommands.tactic call_cvc4 cvc4_logic rt ro ra rf ra' rf' vm_cast [] []
+  (* with e ->  *)
+    (* Exninfo.iraise (Exninfo.capture e) *)
+    (* CoqInterface.error "CVC4: M2" *)
+    (* ModelException (env,rt,ro,ra,rf,smodel) -> *)
+    (* CoqInterface.error
+      ("CVC4 returned sat. Here is the model:\n\n" ) *)
+      (* ^ *)
+        (* SmtCommands.model_string env rt ro ra rf smodel) *)
+
   (* (\* Currently, quantifiers are not handled by the cvc4 tactic: we pass
    *    the same ra and rf twice to have everything reifed *\)
    * SmtCommands.tactic call_cvc4 cvc4_logic rt ro ra rf ra rf vm_cast [] [] *)
-let tactic () = tactic_gen vm_cast_true
+let tactic () = 
+  (* try *)
+  tactic_gen vm_cast_true
+  (* with e -> 
+    CoqInterface.error
+      ("CVC4: There was an error." ) *)
 let tactic_no_check () = tactic_gen (fun _ -> vm_cast_true_no_check)

@@ -89,4 +89,11 @@ val tactic :
   CoqInterface.constr list ->
   CoqInterface.constr_expr list -> CoqInterface.tactic
 
+type model_type = ((string*int)*string) list
 val model_string : Environ.env -> SmtBtype.reify_tbl -> 'a -> 'b -> 'c -> SExpr.t -> string
+val model : Environ.env -> SmtBtype.reify_tbl -> 
+  SmtAtom.Op.reify_tbl ->
+  SmtAtom.Atom.reify_tbl ->
+  SmtAtom.Form.reify ->
+  SExpr.t -> model_type
+val model_to_string : model_type -> string

@@ -1027,15 +1027,23 @@ let model_item env rt ro ra rf =
       * close_out out; *)
      CoqInterface.error ("Could not reconstruct model")
 
+type model_type = ((string*int)*string) list
 
 let model env rt ro ra rf = function
   | List (Atom "model" :: l) ->
-     List.fold_left (fun acc m -> match model_item env rt ro ra rf m with Fun m -> m::acc | Sort -> acc) [] l
+     List.fold_left 
+        (fun acc m -> 
+          match model_item env rt ro ra rf m with 
+            Fun m -> m::acc 
+          | Sort -> acc)
+        [] l
      |> List.sort (fun ((_ ,i1), _) ((_, i2), _) -> i2 - i1)
   | _ -> CoqInterface.error ("No model")
 
-
-let model_string env rt ro ra rf s =
+let model_to_string model =
   String.concat "\n"
     (List.map (fun ((x, _) ,v) -> Format.sprintf "%s := %s" x v)
-       (model env rt ro ra rf s))
+    model)
+
+let model_string env rt ro ra rf s =
+       model_to_string (model env rt ro ra rf s)
