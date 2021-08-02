@@ -11,7 +11,7 @@
   -> Certificate
   -> Form -> Coq Form -> Bool (with proofs each)
   (in Coq) possibly back to Prop, positivity check, ...
-* veriT and is usage support UF_LIA
+* veriT and is usage support UF_LIA (QF_UFLIA)
 * `grep -r "[SOMETHING]" . --exclude "*.glob" --exclude "*.aux" -I --color=always` works great for searching things
 * if one locally modified Coq files, the .vo* files need to be deleted for a fresh recompilation with correct prefixes
 * the tools (especially veriT) need to be installed and in the path
