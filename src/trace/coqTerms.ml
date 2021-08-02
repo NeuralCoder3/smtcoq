@@ -459,3 +459,58 @@ let list_of_constr_tuple =
       t::acc
   in
   list_of_constr_tuple []
+
+let constr_tuple_of_tuple env sigma (t1,t2) =
+  let get_type = CoqInterface.retyping_get_type_of env sigma in
+  CoqInterface.mkApp (Lazy.force cpair,[| 
+    get_type t1;
+    get_type t2;
+    t1;t2
+   |])
+
+let rec constr_tuple_of_list env sigma t =
+  let get_type = CoqInterface.retyping_get_type_of env sigma in
+    match t with
+    | [x] -> x
+    | x::xs -> 
+      let tp = constr_tuple_of_list env sigma xs in
+      CoqInterface.mkApp (Lazy.force cpair,[| 
+      get_type x;get_type tp;
+      x;tp
+      |])
+    | _ -> assert false
+
+(* let constr_list_of_list =
+  let rec constr_list_of_list acc t =
+    match t with
+    | [] -> cnil
+    | x::xs ->CoqInterface.mkApp ccons [| ; |]
+    in
+  constr_list_of_list [] *)
+
+  (* let rec list_of_constr_tuple acc t =
+    let c, args = CoqInterface.decompose_app t in
+    if c = Lazy.force cpair then
+      match args with
+        | [_;_;t1;t2] ->
+           let acc' = list_of_constr_tuple acc t1 in
+           list_of_constr_tuple acc' t2
+        | _ -> assert false
+    else
+      t::acc
+  in
+  list_of_constr_tuple [] *)
+
+
+
+(* let camlstring_of_coqstring (s: char list) =
+  let r = Bytes.create (List.length s) in
+  let rec fill pos = function
+  | [] -> r
+  | c :: s -> Bytes.set r pos c; fill (pos + 1) s
+  in Bytes.to_string (fill 0 s)
+
+let coqstring_of_camlstring s =
+  let rec cstring accu pos =
+    if pos < 0 then accu else cstring (s.[pos] :: accu) (pos - 1)
+  in cstring [] (String.length s - 1) *)

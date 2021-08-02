@@ -274,3 +274,5 @@ val mk_bvsize : CoqInterface.constr -> int
 (* Switches between constr and OCaml *)
 val option_of_constr_option : CoqInterface.constr -> CoqInterface.constr option
 val list_of_constr_tuple : CoqInterface.constr -> CoqInterface.constr list
+val constr_tuple_of_list: Environ.env -> Evd.evar_map -> CoqInterface.constr list -> CoqInterface.constr
+val constr_tuple_of_tuple: Environ.env -> Evd.evar_map -> CoqInterface.constr*CoqInterface.constr -> CoqInterface.constr
