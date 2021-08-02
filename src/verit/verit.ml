@@ -370,6 +370,7 @@ let import_bool name smt fsmt fproof =
     | None -> CoqInterface.error( "This term has no value")
     | Some(e, _, _) ->
 
+  clear_all ();
       let env = Global.env () in
       let sigma = Evd.from_env env in
 
@@ -377,13 +378,43 @@ let import_bool name smt fsmt fproof =
 
       let lsmt = Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t in
       let first = lsmt in
-      let root = SmtTrace.mkRootV [first] in (* Form.neg *)
-      let roots = Smtlib2_genConstr.import_smtlib2 rt ro ra rf fsmt in
+      let root = SmtTrace.mkRootV [first] in 
+      let roots = [first] in 
+
+      (* writes function table *)
+      let (filename, outchan) = Filename.open_temp_file "verit_coq" ".smt2" in
+      export outchan rt ro [lsmt];
+      close_out outchan;
+
+      (* Form.neg *)
+  (* let rt2 = SmtBtype.create () in
+  let ro2 = Op.create () in
+  let ra2 = VeritSyntax.ra in
+  let rf2 = VeritSyntax.rf in *)
+      (* let roots = Smtlib2_genConstr.import_smtlib2 rt2 ro2 ra2 rf2 fsmt in *)
+      (* let roots = Smtlib2_genConstr.import_smtlib2 rt ro2 ra rf fsmt in *)
+      (* let roots = Smtlib2_genConstr.import_smtlib2 rt ro ra rf fsmt in *)
+
+      let _ = (
+      root
+      ,t,sigma
+      (* ,rt2,ro2,ra2,rf2 *)
+      ) in
+      (* let root = [lsmt] in *)
+
+
+
+
+
+
+
 
       let (max_id, confl) = import_trace ra_quant rf_quant fproof (Some (root,first)) [lsmt] in
   (* let (max_id, confl) = import_trace ra_quant rf_quant fproof None [] in *)
   (* let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in *)
       SmtCommands.theorem name (rt, ro, ra, rf, roots, max_id, confl)
+      (* ~find:(Some find_lemma) *)
+      (* SmtCommands.theorem name (rt, ro, ra, rf, root, max_id, confl) *)
 
 
       (* let forward _ rt ro ra_quant rf_quant first lsmt =
