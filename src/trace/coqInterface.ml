@@ -209,3 +209,9 @@ let vm_conv = Vconv.vm_conv
 
 (* Cannot contain evars since it comes from a Constr.t *)
 let cbv_vm env c t = EConstr.Unsafe.to_constr (Vnorm.cbv_vm env Evd.empty (EConstr.of_constr c) (EConstr.of_constr t))
+
+(* not really fresh; rather refresh *)
+let fresh_pose nameStr body =
+  tclTHEN
+    (Tactics.clear [mkId nameStr])
+    (Tactics.pose_tac (mkName nameStr) body)

@@ -26,7 +26,7 @@ val mkId : string -> id
 
 type globRef = Names.GlobRef.t
 
-type name
+type name = Names.Name.t
 val name_of_id : id -> name
 val mkName : string -> name
 val string_of_name : name -> string
@@ -128,3 +128,4 @@ val retyping_get_type_of : Environ.env -> Evd.evar_map -> constr -> constr
 
 val vm_conv : Reduction.conv_pb -> types Reduction.kernel_conversion_function
 val cbv_vm : Environ.env -> constr -> types -> constr
+val fresh_pose : string -> econstr -> tactic
