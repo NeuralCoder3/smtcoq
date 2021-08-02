@@ -151,6 +151,29 @@ TACTIC EXTEND Tactic_verit
 END
 
 TACTIC EXTEND Tactic_cvc4
+| [ "cvc4_bool_model" ] -> { Lfsc.tactic_model () }
 | [ "cvc4_bool" ] -> { Lfsc.tactic () }
 | [ "cvc4_bool_no_check" ] -> { Lfsc.tactic_no_check () }
 END
+
+
+
+
+(*
+to return something
+https://github.com/ppedrot/coq-string-ident/blob/master/src/tacstringident.mlg
+https://coq.discourse.group/t/how-can-an-ocaml-tactic-return-something-else-than-unit/812
+
+{
+
+open Pcoq.Constr
+
+let inj c = TacGeneric (Genarg.in_gen (Genarg.rawwit wit_ident_of_string) c)
+
+}
+
+GRAMMAR EXTEND Gram
+  Pltac.tactic_arg :
+  [ [ IDENT "ident_of_string"; c = constr -> { inj c } ] ];
+END
+*)
