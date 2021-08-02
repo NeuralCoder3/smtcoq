@@ -405,6 +405,39 @@ let import_bool name smt fsmt fproof =
 
 
 
+  (* let lcpl = [] in
+  let lcepl = [] in
+  let tlcepl = List.map (CoqInterface.interp_constr env sigma) lcepl in
+  let lcpl = lcpl @ tlcepl in
+
+  let create_lemma l =
+    let cl = CoqInterface.retyping_get_type_of env sigma l in
+    match SmtCommands.of_coq_lemma rt ro ra_quant rf_quant env sigma verit_logic cl with
+      | Some smt -> Some ((cl, l), smt)
+      | None -> None
+  in
+  let l_pl_ls = SmtMisc.filter_map create_lemma lcpl in
+  let lsmt2 = List.map snd l_pl_ls in
+
+  let lem_tbl : (int, CoqInterface.constr * CoqInterface.constr) Hashtbl.t =
+    Hashtbl.create 100 in
+  let new_ref ((l, pl), ls) =
+    Hashtbl.add lem_tbl (Form.index ls) (l, pl) in
+
+  List.iter new_ref l_pl_ls;
+  let find_lemma cl =
+    let re_hash hf = Form.hash_hform (Atom.hash_hatom ra_quant) rf_quant hf in
+    match cl.value with
+    | Some [l] ->
+       let hl = re_hash l in
+       begin try Hashtbl.find lem_tbl (Form.index hl)
+             with Not_found ->
+               let oc = open_out "/tmp/find_lemma.log" in
+               let fmt = Format.formatter_of_out_channel oc in
+               List.iter (fun u -> Format.fprintf fmt "%a\n" (Form.to_smt ~debug:true) u) lsmt2;
+               Format.fprintf fmt "\n%a\n" (Form.to_smt ~debug:true) hl;
+               flush oc; close_out oc; failwith "find_lemma" end
+      | _ -> failwith "unexpected form of root" in *)
 
 
 
@@ -414,6 +447,7 @@ let import_bool name smt fsmt fproof =
   (* let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in *)
       SmtCommands.theorem name (rt, ro, ra, rf, roots, max_id, confl)
       (* ~find:(Some find_lemma) *)
+
       (* SmtCommands.theorem name (rt, ro, ra, rf, root, max_id, confl) *)
 
 
