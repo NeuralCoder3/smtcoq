@@ -183,7 +183,7 @@ let interp_roots t_i roots =
     | [] -> Lazy.force ctrue
     | f::roots -> List.fold_left (fun acc f -> mklApp candb [|acc; interp f|]) (interp f) roots
 
-let theorem name (rt, ro, ra, rf, roots, max_id, confl) =
+let theorem ?(find=None) name (rt, ro, ra, rf, roots, max_id, confl) =
   let nti = CoqInterface.mkName "t_i" in
   let ntfunc = CoqInterface.mkName "t_func" in
   let ntatom = CoqInterface.mkName "t_atom" in
@@ -202,7 +202,7 @@ let theorem name (rt, ro, ra, rf, roots, max_id, confl) =
   (* EMPTY LEMMA LIST *)
   let (tres,last_root,cuts) = SmtTrace.to_coq (fun i -> mkInt (Form.to_lit i))
       (interp_conseq_uf t_i)
-      (certif_ops (Some [|v 4(*t_i*); v 3(*t_func*); v 2(*t_atom*); v 1(* t_form *)|])) confl None in
+      (certif_ops (Some [|v 4(*t_i*); v 3(*t_func*); v 2(*t_atom*); v 1(* t_form *)|])) confl find in
   List.iter (fun (v,ty) ->
     let _ = CoqInterface.declare_new_variable v ty in
     print_assm ty
@@ -555,6 +555,342 @@ let checker_debug (rt, ro, ra, rf, roots, max_id, confl) =
  *                      that fail to be checked by SMTCoq.") *)
 
 
+(**********************************************)
+(* Show solver models as Coq counter-examples *)
+(**********************************************)
+
+
+open SExpr
+open Smtlib2_genConstr
+open Format
+
+
+let string_index_of_constr env i cf =
+  try
+    let s = string_coq_constr cf in
+    let nc = Environ.named_context env in
+    let nd = Environ.lookup_named (CoqInterface.mkId s) env in
+    let cpt = ref 0 in
+    (try List.iter (fun n -> incr cpt; if n == nd then raise Exit) nc
+     with Exit -> ());
+    s, !cpt
+  with _ -> string_coq_constr cf, -i
+
+
+let vstring_i env i =
+  let cf = SmtAtom.Atom.get_coq_term_op i in
+  if CoqInterface.isRel cf then
+    let dbi = CoqInterface.destRel cf in
+    let s =
+      Environ.lookup_rel dbi env
+      |> CoqInterface.get_rel_dec_name
+      |> SmtMisc.string_of_name_def "?"
+    in
+    s, dbi
+  else
+    string_index_of_constr env i cf
+
+
+let sstring_i env i v =
+  let tf = SmtBtype.get_coq_type_op i in
+  let (s, idx) = string_index_of_constr env i tf in
+  (s^"#"^v, idx)
+
+
+let smt2_id_to_coq_string env t_i ra rf name =
+  try
+    let l = String.split_on_char '_' name in
+    match l with
+      | ["op"; i] -> vstring_i env (int_of_string i)
+      | ["@uc"; "Tindex"; i; j] -> sstring_i env (int_of_string i) j
+      | _ -> raise Not_found
+  with _ -> (name, 0)
+
+
+let op_to_coq_string op = match op with
+  | "=" | "+" | "-" | "*" | "/" -> op
+  | "or" -> "||"
+  | "and" -> "&&"
+  | "xor" -> "xorb"
+  | "=>" -> "implb"
+  | _ -> op
+
+
+let coq_bv_string s =
+  let rec aux acc = function
+    | true :: r -> aux (acc ^ "|1") r
+    | false :: r -> aux (acc ^ "|0") r
+    | [] -> "#b" ^ acc ^ "|"
+  in
+  if String.length s < 3 ||
+     not (s.[0] = '#' && s.[1] = 'b') then failwith "not bv";
+  aux "" (parse_smt2bv s)
+
+
+let is_bvint bs =
+  try Scanf.sscanf bs "bv%s" (fun s ->
+      try ignore (Big_int.big_int_of_string s); true
+      with _ -> false)
+  with _ -> false
+
+
+let rec smt2_sexpr_to_coq_string env t_i ra rf =
+  let open SExpr in function
+  | Atom "true" -> "true"
+  | Atom "false" -> "false"
+  | Atom s ->
+    (try ignore (int_of_string s); s
+     with Failure _ ->
+     try coq_bv_string s
+     with Failure _ ->
+     try fst (smt2_id_to_coq_string env t_i ra rf s)
+     with _ -> s)
+  | List [Atom "as"; Atom "const"; _] -> "const_farray"
+  | List [Atom "as"; s; _] -> smt2_sexpr_to_coq_string env t_i ra rf s
+  | List [Atom "_"; Atom bs; Atom s] when is_bvint bs ->
+    Scanf.sscanf bs "bv%s" (fun i ->
+        coq_bv_string (bigint_bv (Big_int.big_int_of_string i)
+                         (int_of_string s)))
+  | List [Atom "-"; Atom _ as s] ->
+    sprintf "-%s"
+      (smt2_sexpr_to_coq_string env t_i ra rf s)
+  | List [Atom "-"; s] ->
+    sprintf "(- %s)"
+      (smt2_sexpr_to_coq_string env t_i ra rf s)
+  | List [Atom (("+"|"-"|"*"|"/"|"or"|"and"|"=") as op); s1; s2] ->
+    sprintf "%s %s %s"
+      (smt2_sexpr_to_coq_string env t_i ra rf s1)
+      (op_to_coq_string op)
+      (smt2_sexpr_to_coq_string env t_i ra rf s2)
+  | List [Atom (("xor"|"=>"|"") as op); s1; s2] ->
+    sprintf "(%s %s %s)"
+      (op_to_coq_string op)
+      (smt2_sexpr_to_coq_string env t_i ra rf s1)
+      (smt2_sexpr_to_coq_string env t_i ra rf s2)
+  | List [Atom "select"; a; i] ->
+    sprintf "%s[%s]"
+      (smt2_sexpr_to_coq_string env t_i ra rf a)
+      (smt2_sexpr_to_coq_string env t_i ra rf i)
+  | List [Atom "store"; a; i; v] ->
+    sprintf "%s[%s <- %s]"
+      (smt2_sexpr_to_coq_string env t_i ra rf a)
+      (smt2_sexpr_to_coq_string env t_i ra rf i)
+      (smt2_sexpr_to_coq_string env t_i ra rf v)
+  | List [Atom "ite"; c; s1; s2] ->
+    sprintf "if %s then %s else %s"
+      (smt2_sexpr_to_coq_string env t_i ra rf c)
+      (smt2_sexpr_to_coq_string env t_i ra rf s1)
+      (smt2_sexpr_to_coq_string env t_i ra rf s2)
+  | List l ->
+    sprintf "(%s)"
+      (String.concat " " (List.map (smt2_sexpr_to_coq_string env t_i ra rf) l))
+
+
+let str_contains s1 s2 =
+  let re = Str.regexp_string s2 in
+  try ignore (Str.search_forward re s1 0); true
+  with Not_found -> false
+
+let lambda_to_coq_string l s =
+  Format.sprintf "fun %s => %s"
+    (String.concat " "
+       (List.map (function
+            | List [Atom v; _] ->
+              if str_contains s v then v else "_"
+            | _ -> assert false) l))
+    s
+
+type model =
+  | Fun of ((string * int) * string)
+  | Sort
+
+let model_item env rt ro ra rf =
+  let t_i = make_t_i rt in
+  function
+  | List [Atom "define-fun"; Atom n; List []; _; expr] ->
+     Fun (smt2_id_to_coq_string env t_i ra rf n,
+           smt2_sexpr_to_coq_string env t_i ra rf expr)
+
+  | List [Atom "define-fun"; Atom n; List l; _; expr] ->
+     Fun (smt2_id_to_coq_string env t_i ra rf n,
+           lambda_to_coq_string l
+             (smt2_sexpr_to_coq_string env t_i ra rf expr))
+
+  | List [Atom "declare-sort"; Atom n; _] ->
+     Sort
+
+  | l ->
+     (* let out = open_out_gen [Open_append] 700 "/tmp/test.log" in
+      * let outf = Format.formatter_of_out_channel out in
+      * SExpr.print outf l; pp_print_flush outf ();
+      * close_out out; *)
+     CoqInterface.error ("Could not reconstruct model")
+
+type model_type = ((string*int)*string) list
+
+let model env rt ro ra rf = function
+  | List (Atom "model" :: l) ->
+     List.fold_left 
+        (fun acc m -> 
+          match model_item env rt ro ra rf m with 
+            Fun m -> m::acc 
+          | Sort -> acc)
+        [] l
+     |> List.sort (fun ((_ ,i1), _) ((_, i2), _) -> i2 - i1)
+  | _ -> CoqInterface.error ("No model")
+
+let model_to_string model =
+  String.concat "\n"
+    (List.map (fun ((x, _) ,v) -> Format.sprintf "%s := %s" x v)
+    model)
+
+let model_string env rt ro ra rf s =
+       model_to_string (model env rt ro ra rf s)
+
+
+
+
+
+type model_constr =
+  | FunConstr of ((CoqInterface.constr * int) * CoqInterface.constr)
+  (* | FunConstr of ((CoqInterface.constr * int) * string) *)
+  | SortConstr
+
+let string_index_of_constr_id env i cf =
+  try
+    (* for index *)
+    let s = string_coq_constr cf in
+    let nc = Environ.named_context env in
+    let nd = Environ.lookup_named (CoqInterface.mkId s) env in
+    let cpt = ref 0 in
+    (try List.iter (fun n -> incr cpt; if n == nd then raise Exit) nc
+     with Exit -> ());
+    cf, !cpt
+  with _ -> cf, -i
+
+let vstring_i_id env i =
+  let cf = SmtAtom.Atom.get_coq_term_op i in
+    (* for index *)
+  if CoqInterface.isRel cf then
+    let dbi = CoqInterface.destRel cf in
+    (* let s =
+      Environ.lookup_rel dbi env
+      |> CoqInterface.get_rel_dec_name
+      |> SmtMisc.string_of_name_def "?"
+    in *)
+    cf, dbi
+  else
+    string_index_of_constr_id env i cf
+
+let sstring_i_id env i v =
+  let tf = SmtBtype.get_coq_type_op i in
+  let (s, idx) = string_index_of_constr_id env i tf in
+  (tf, idx)
+
+let smt2_id_to_coq_id env t_i ra rf name =
+  (* try *)
+    let l = String.split_on_char '_' name in
+    match l with
+      | ["op"; i] -> vstring_i_id env (int_of_string i)
+      | ["@uc"; "Tindex"; i; j] -> sstring_i_id env (int_of_string i) j
+      | _ -> raise Not_found
+  (* with _ -> (name, 0) *)
+
+let smt2_sexpr_to_coq_constr env t_i ra rf =
+  let open SExpr in function
+  | Atom "true" -> Lazy.force ctrue
+  | Atom "false" -> Lazy.force cfalse
+  | Atom s ->
+    (* the first case is also for numbers => find in ra? *)
+    (try ignore (int_of_string s); CoqInterface.error ("Got model atom: "^s)
+     with Failure _ ->
+     (* try coq_bv_string s
+     with Failure _ -> *)
+     try fst (smt2_id_to_coq_id env t_i ra rf s)
+     with _ -> CoqInterface.error ("Got model atom (P2): "^s))
+  | _ -> CoqInterface.error "TODO: Implement complex model reification"
+  (* | List [Atom "as"; Atom "const"; _] -> "const_farray"
+  | List [Atom "as"; s; _] -> smt2_sexpr_to_coq_constr env t_i ra rf s
+  | List [Atom "_"; Atom bs; Atom s] when is_bvint bs ->
+    Scanf.sscanf bs "bv%s" (fun i ->
+        coq_bv_string (bigint_bv (Big_int.big_int_of_string i)
+                         (int_of_string s)))
+  | List [Atom "-"; Atom _ as s] ->
+    sprintf "-%s"
+      (smt2_sexpr_to_coq_constr env t_i ra rf s)
+  | List [Atom "-"; s] ->
+    sprintf "(- %s)"
+      (smt2_sexpr_to_coq_constr env t_i ra rf s)
+  | List [Atom (("+"|"-"|"*"|"/"|"or"|"and"|"=") as op); s1; s2] ->
+    sprintf "%s %s %s"
+      (smt2_sexpr_to_coq_constr env t_i ra rf s1)
+      (op_to_coq_constr op)
+      (smt2_sexpr_to_coq_constr env t_i ra rf s2)
+  | List [Atom (("xor"|"=>"|"") as op); s1; s2] ->
+    sprintf "(%s %s %s)"
+      (op_to_coq_constr op)
+      (smt2_sexpr_to_coq_constr env t_i ra rf s1)
+      (smt2_sexpr_to_coq_constr env t_i ra rf s2)
+  | List [Atom "select"; a; i] ->
+    sprintf "%s[%s]"
+      (smt2_sexpr_to_coq_constr env t_i ra rf a)
+      (smt2_sexpr_to_coq_constr env t_i ra rf i)
+  | List [Atom "store"; a; i; v] ->
+    sprintf "%s[%s <- %s]"
+      (smt2_sexpr_to_coq_constr env t_i ra rf a)
+      (smt2_sexpr_to_coq_constr env t_i ra rf i)
+      (smt2_sexpr_to_coq_constr env t_i ra rf v)
+  | List [Atom "ite"; c; s1; s2] ->
+    sprintf "if %s then %s else %s"
+      (smt2_sexpr_to_coq_constr env t_i ra rf c)
+      (smt2_sexpr_to_coq_constr env t_i ra rf s1)
+      (smt2_sexpr_to_coq_constr env t_i ra rf s2)
+  | List l ->
+    sprintf "(%s)"
+      (String.concat " " (List.map (smt2_sexpr_to_coq_constr env t_i ra rf) l)) *)
+
+let lambda_to_coq_constr l s =
+  CoqInterface.error "TODO: Implement lambda model to coq constr"
+
+let model_constr_item env rt ro ra rf =
+  let t_i = make_t_i rt in
+  function
+  | List [Atom "define-fun"; Atom n; List []; _; expr] ->
+     FunConstr (smt2_id_to_coq_id env t_i ra rf n,
+           smt2_sexpr_to_coq_constr env t_i ra rf expr)
+
+  | List [Atom "define-fun"; Atom n; List l; _; expr] ->
+     FunConstr (smt2_id_to_coq_id env t_i ra rf n,
+           lambda_to_coq_constr l
+             (smt2_sexpr_to_coq_constr env t_i ra rf expr))
+
+  | List [Atom "declare-sort"; Atom n; _] -> SortConstr
+  | l -> CoqInterface.error ("Could not reconstruct model")
+
+let model_constr env rt ro ra rf s = 
+  match s with
+  | List (Atom "model" :: l) ->
+     List.fold_left 
+        (fun acc m -> 
+          match model_constr_item env rt ro ra rf m with 
+            FunConstr m -> m::acc 
+          | SortConstr -> acc
+        )
+        [] l
+     |> List.sort (fun ((_ ,i1), _) ((_, i2), _) -> i2 - i1)
+     (* |> List.map (fun ((a ,_), b) -> a^" := "^b) *)
+     |> List.map (fun ((a ,_), b) -> (a,b))
+     (* |> String.concat "\n" *)
+     (* |> CoqInterface.error *)
+  | _ -> CoqInterface.error ("No model")
+       (* model_to_string (model env rt ro ra rf s) *)
+
+
+
+
+
+
+
 
 (* Tactic *)
 
@@ -780,8 +1116,27 @@ let of_coq_lemma rt ro ra_quant rf_quant env sigma solver_logic clemma =
   in
   body_cast *)
 
+(* exception ModelException of SmtCommands.model_type *)
+type full_model_type = 
+    (Environ.env * SmtBtype.reify_tbl * 
+    SmtAtom.Op.reify_tbl *
+    SmtAtom.Atom.reify_tbl *
+    SmtAtom.Form.reify *
+    SExpr.t)
+exception ModelException of full_model_type
 
-let core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl env sigma concl =
+
+let print_model (env,rt,ro,ra,rf,smodel) =
+    CoqInterface.error
+      ("CVC4 returned sat. Here is the model:\n\n" ^
+        model_string env rt ro ra rf smodel)
+
+let id x = x
+
+(* generalize exception (thrown by call_solver) for sat_handler *)
+(* move parts into unsat_handler *)
+
+let core_tactic unsat_handler sat_handler call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl env sigma concl =
   let a, b = get_arguments concl in
 
   let tlcepl = List.map (CoqInterface.interp_constr env sigma) lcepl in
@@ -816,6 +1171,8 @@ let core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast l
                Format.fprintf fmt "\n%a\n" (Form.to_smt ~debug:true) hl;
                flush oc; close_out oc; failwith "find_lemma" end
       | _ -> failwith "unexpected form of root" in
+    
+  try 
 
   let (body_cast, body_nocast, cuts) =
     if ((CoqInterface.eq_constr b (Lazy.force ctrue)) ||
@@ -840,210 +1197,20 @@ let core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast l
 
       let cuts = (SmtBtype.get_cuts rt) @ cuts in
 
-  List.fold_right (fun (eqn, eqt) tac ->
+  unsat_handler (List.fold_right (fun (eqn, eqt) tac ->
       CoqInterface.tclTHENLAST
         (CoqInterface.assert_before (CoqInterface.name_of_id eqn) eqt)
         tac
     ) cuts
     (CoqInterface.tclTHEN
        (CoqInterface.set_evars_tac body_nocast)
-       (CoqInterface.vm_cast_no_check body_cast))
+       (CoqInterface.vm_cast_no_check body_cast)))
+
+  with ModelException x -> 
+    sat_handler x
 
 
-let tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl =
+let tactic ?(unsat_handler=id) ?(sat_handler=print_model) call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl =
   CoqInterface.tclTHEN
     Tactics.intros
-    (CoqInterface.mk_tactic (core_tactic call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl))
-
-
-(**********************************************)
-(* Show solver models as Coq counter-examples *)
-(**********************************************)
-
-
-open SExpr
-open Smtlib2_genConstr
-open Format
-
-
-let string_index_of_constr env i cf =
-  try
-    let s = string_coq_constr cf in
-    let nc = Environ.named_context env in
-    let nd = Environ.lookup_named (CoqInterface.mkId s) env in
-    let cpt = ref 0 in
-    (try List.iter (fun n -> incr cpt; if n == nd then raise Exit) nc
-     with Exit -> ());
-    s, !cpt
-  with _ -> string_coq_constr cf, -i
-
-
-let vstring_i env i =
-  let cf = SmtAtom.Atom.get_coq_term_op i in
-  if CoqInterface.isRel cf then
-    let dbi = CoqInterface.destRel cf in
-    let s =
-      Environ.lookup_rel dbi env
-      |> CoqInterface.get_rel_dec_name
-      |> SmtMisc.string_of_name_def "?"
-    in
-    s, dbi
-  else
-    string_index_of_constr env i cf
-
-
-let sstring_i env i v =
-  let tf = SmtBtype.get_coq_type_op i in
-  let (s, idx) = string_index_of_constr env i tf in
-  (s^"#"^v, idx)
-
-
-let smt2_id_to_coq_string env t_i ra rf name =
-  try
-    let l = String.split_on_char '_' name in
-    match l with
-      | ["op"; i] -> vstring_i env (int_of_string i)
-      | ["@uc"; "Tindex"; i; j] -> sstring_i env (int_of_string i) j
-      | _ -> raise Not_found
-  with _ -> (name, 0)
-
-
-let op_to_coq_string op = match op with
-  | "=" | "+" | "-" | "*" | "/" -> op
-  | "or" -> "||"
-  | "and" -> "&&"
-  | "xor" -> "xorb"
-  | "=>" -> "implb"
-  | _ -> op
-
-
-let coq_bv_string s =
-  let rec aux acc = function
-    | true :: r -> aux (acc ^ "|1") r
-    | false :: r -> aux (acc ^ "|0") r
-    | [] -> "#b" ^ acc ^ "|"
-  in
-  if String.length s < 3 ||
-     not (s.[0] = '#' && s.[1] = 'b') then failwith "not bv";
-  aux "" (parse_smt2bv s)
-
-
-let is_bvint bs =
-  try Scanf.sscanf bs "bv%s" (fun s ->
-      try ignore (Big_int.big_int_of_string s); true
-      with _ -> false)
-  with _ -> false
-
-
-let rec smt2_sexpr_to_coq_string env t_i ra rf =
-  let open SExpr in function
-  | Atom "true" -> "true"
-  | Atom "false" -> "false"
-  | Atom s ->
-    (try ignore (int_of_string s); s
-     with Failure _ ->
-     try coq_bv_string s
-     with Failure _ ->
-     try fst (smt2_id_to_coq_string env t_i ra rf s)
-     with _ -> s)
-  | List [Atom "as"; Atom "const"; _] -> "const_farray"
-  | List [Atom "as"; s; _] -> smt2_sexpr_to_coq_string env t_i ra rf s
-  | List [Atom "_"; Atom bs; Atom s] when is_bvint bs ->
-    Scanf.sscanf bs "bv%s" (fun i ->
-        coq_bv_string (bigint_bv (Big_int.big_int_of_string i)
-                         (int_of_string s)))
-  | List [Atom "-"; Atom _ as s] ->
-    sprintf "-%s"
-      (smt2_sexpr_to_coq_string env t_i ra rf s)
-  | List [Atom "-"; s] ->
-    sprintf "(- %s)"
-      (smt2_sexpr_to_coq_string env t_i ra rf s)
-  | List [Atom (("+"|"-"|"*"|"/"|"or"|"and"|"=") as op); s1; s2] ->
-    sprintf "%s %s %s"
-      (smt2_sexpr_to_coq_string env t_i ra rf s1)
-      (op_to_coq_string op)
-      (smt2_sexpr_to_coq_string env t_i ra rf s2)
-  | List [Atom (("xor"|"=>"|"") as op); s1; s2] ->
-    sprintf "(%s %s %s)"
-      (op_to_coq_string op)
-      (smt2_sexpr_to_coq_string env t_i ra rf s1)
-      (smt2_sexpr_to_coq_string env t_i ra rf s2)
-  | List [Atom "select"; a; i] ->
-    sprintf "%s[%s]"
-      (smt2_sexpr_to_coq_string env t_i ra rf a)
-      (smt2_sexpr_to_coq_string env t_i ra rf i)
-  | List [Atom "store"; a; i; v] ->
-    sprintf "%s[%s <- %s]"
-      (smt2_sexpr_to_coq_string env t_i ra rf a)
-      (smt2_sexpr_to_coq_string env t_i ra rf i)
-      (smt2_sexpr_to_coq_string env t_i ra rf v)
-  | List [Atom "ite"; c; s1; s2] ->
-    sprintf "if %s then %s else %s"
-      (smt2_sexpr_to_coq_string env t_i ra rf c)
-      (smt2_sexpr_to_coq_string env t_i ra rf s1)
-      (smt2_sexpr_to_coq_string env t_i ra rf s2)
-  | List l ->
-    sprintf "(%s)"
-      (String.concat " " (List.map (smt2_sexpr_to_coq_string env t_i ra rf) l))
-
-
-let str_contains s1 s2 =
-  let re = Str.regexp_string s2 in
-  try ignore (Str.search_forward re s1 0); true
-  with Not_found -> false
-
-let lambda_to_coq_string l s =
-  Format.sprintf "fun %s => %s"
-    (String.concat " "
-       (List.map (function
-            | List [Atom v; _] ->
-              if str_contains s v then v else "_"
-            | _ -> assert false) l))
-    s
-
-type model =
-  | Fun of ((string * int) * string)
-  | Sort
-
-let model_item env rt ro ra rf =
-  let t_i = make_t_i rt in
-  function
-  | List [Atom "define-fun"; Atom n; List []; _; expr] ->
-     Fun (smt2_id_to_coq_string env t_i ra rf n,
-           smt2_sexpr_to_coq_string env t_i ra rf expr)
-
-  | List [Atom "define-fun"; Atom n; List l; _; expr] ->
-     Fun (smt2_id_to_coq_string env t_i ra rf n,
-           lambda_to_coq_string l
-             (smt2_sexpr_to_coq_string env t_i ra rf expr))
-
-  | List [Atom "declare-sort"; Atom n; _] ->
-     Sort
-
-  | l ->
-     (* let out = open_out_gen [Open_append] 700 "/tmp/test.log" in
-      * let outf = Format.formatter_of_out_channel out in
-      * SExpr.print outf l; pp_print_flush outf ();
-      * close_out out; *)
-     CoqInterface.error ("Could not reconstruct model")
-
-type model_type = ((string*int)*string) list
-
-let model env rt ro ra rf = function
-  | List (Atom "model" :: l) ->
-     List.fold_left 
-        (fun acc m -> 
-          match model_item env rt ro ra rf m with 
-            Fun m -> m::acc 
-          | Sort -> acc)
-        [] l
-     |> List.sort (fun ((_ ,i1), _) ((_, i2), _) -> i2 - i1)
-  | _ -> CoqInterface.error ("No model")
-
-let model_to_string model =
-  String.concat "\n"
-    (List.map (fun ((x, _) ,v) -> Format.sprintf "%s := %s" x v)
-    model)
-
-let model_string env rt ro ra rf s =
-       model_to_string (model env rt ro ra rf s)
+    (CoqInterface.mk_tactic (core_tactic unsat_handler sat_handler call_solver solver_logic rt ro ra rf ra_quant rf_quant vm_cast lcpl lcepl))

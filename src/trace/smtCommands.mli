@@ -45,6 +45,9 @@ val checker_debug :
   meanwhile the needed variables are generated as local axioms
 *)
 val theorem :
+  ?find:(SmtAtom.Form.t SmtCertif.clause ->
+                  CoqInterface.types * CoqInterface.constr)
+                 option ->
   CoqInterface.id ->
   SmtBtype.reify_tbl * SmtAtom.Op.reify_tbl *
   SmtAtom.Atom.reify_tbl * SmtAtom.Form.reify *
@@ -56,6 +59,15 @@ val checker :
   SmtAtom.Atom.reify_tbl * SmtAtom.Form.reify *
   SmtAtom.Form.t list * int * SmtAtom.Form.t SmtCertif.clause ->
   unit
+
+val of_coq_lemma :
+  SmtBtype.reify_tbl ->
+  SmtAtom.Op.reify_tbl ->
+  SmtAtom.Atom.reify_tbl ->
+  SmtAtom.Form.reify ->
+  Environ.env ->
+  Evd.evar_map ->
+  SmtMisc.logic -> CoqInterface.constr -> SmtAtom.Form.t option
 
 (*
   a tactic that generates a proof inline
@@ -69,8 +81,22 @@ val checker :
   and returns the coq proof
 
   some tables are modified as side effect
+
+  ro = name table
+  lpl = lcpl = (Coq Tactic) get_hyps = None or Some local_axioms, hypotheses => list (for instnace [])
+    not variables
+  lcepl = get_lemmas in commands.mlg => list added lemmas
 *)
+type full_model_type = 
+    (Environ.env * SmtBtype.reify_tbl * 
+    SmtAtom.Op.reify_tbl *
+    SmtAtom.Atom.reify_tbl *
+    SmtAtom.Form.reify *
+    SExpr.t)
+exception ModelException of full_model_type
 val tactic :
+  ?unsat_handler: (CoqInterface.tactic -> unit Proofview.tactic) ->
+  ?sat_handler: (full_model_type -> unit Proofview.tactic) ->
   (Environ.env ->
    SmtBtype.reify_tbl ->
    SmtAtom.Op.reify_tbl ->
@@ -87,7 +113,7 @@ val tactic :
   SmtAtom.Form.reify ->
   (Environ.env -> CoqInterface.constr -> CoqInterface.constr) ->
   CoqInterface.constr list ->
-  CoqInterface.constr_expr list -> CoqInterface.tactic
+  CoqInterface.constr_expr list -> unit Proofview.tactic
 
 type model_type = ((string*int)*string) list
 val model_string : Environ.env -> SmtBtype.reify_tbl -> 'a -> 'b -> 'c -> SExpr.t -> string
@@ -97,3 +123,5 @@ val model : Environ.env -> SmtBtype.reify_tbl ->
   SmtAtom.Form.reify ->
   SExpr.t -> model_type
 val model_to_string : model_type -> string
+
+val model_constr : Environ.env -> SmtBtype.reify_tbl -> 'a -> 'b -> 'c -> SExpr.t -> (CoqInterface.constr*CoqInterface.constr) list
