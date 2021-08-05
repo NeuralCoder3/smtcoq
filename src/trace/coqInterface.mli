@@ -120,6 +120,7 @@ type constr_expr = Constrexpr.constr_expr
 val error : string -> 'a
 val warning : string -> string -> unit
 val destruct_rel_decl : (constr, types) Context.Rel.Declaration.pt -> name * types
+val destruct_name_decl : (constr, types) Context.Named.Declaration.pt -> Names.Id.t * types
 val interp_constr : Environ.env -> Evd.evar_map -> constr_expr -> constr
 val ppconstr_lsimpleconstr : Constrexpr.entry_relative_level
 val constrextern_extern_constr : constr -> constr_expr

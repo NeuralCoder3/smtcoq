@@ -185,6 +185,8 @@ type constr_expr = Constrexpr.constr_expr
 let error s = CErrors.user_err (Pp.str s)
 let warning n s = CWarnings.create ~name:n ~category:"SMTCoq plugin" Pp.str s
 
+let destruct_name_decl r = Context.Named.Declaration.get_id r,
+                           Context.Named.Declaration.get_type r
 let destruct_rel_decl r = Context.Rel.Declaration.get_name r,
                           Context.Rel.Declaration.get_type r
 

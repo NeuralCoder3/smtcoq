@@ -151,7 +151,11 @@ let export out_channel rt ro lsmt =
   ) (SmtBtype.to_list rt);
 
   List.iter (fun (i,dom,cod,op) ->
-    let s = "op_"^(string_of_int i) in
+    let op_idx = SmtAtom.index_of_indexed_op op in
+    let s = 
+      match op_idx with
+      | Rel_name n | Rel_name2 (_,n) -> n
+      | _ -> "op_"^(string_of_int i) in
     SmtMaps.add_fun s op;
     Format.fprintf fmt "(declare-fun %s (" s;
     let is_first = ref true in

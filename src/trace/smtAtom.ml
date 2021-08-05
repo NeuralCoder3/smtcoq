@@ -89,15 +89,21 @@ type op_def = {
 
 type index = Index of int
            | Rel_name of string
+           | Rel_name2 of int*string
 
 type indexed_op = index * op_def
 
 let destruct s (i, hval) = match i with
     | Index index -> index, hval
     | Rel_name _ -> failwith s
+    | Rel_name2 (idx,name) -> idx,hval
 
 let dummy_indexed_op i dom codom =
   (i, {tparams = dom; tres = codom; op_val = CoqInterface.mkProp})
+
+let index_of_indexed_op i =
+  let index, _ = i in
+  index
 
 let indexed_op_index i =
   let index, _ = destruct "destruct on a Rel: called by indexed_op_index" i in
@@ -372,7 +378,14 @@ module Op =
                  Hashtbl.add reify.tbl op res;
                  reify.count <- reify.count + 1;
                  res
-      | Some name -> Rel_name name, opa
+      | Some (Either.Left name) -> Rel_name name, opa
+      | Some (Either.Right name) -> 
+            (* let res = Index reify.count, opa in *)
+            let res = Rel_name2 (reify.count,name), opa in
+            Hashtbl.add reify.tbl op res;
+            reify.count <- reify.count + 1;
+            res
+        (* Rel_name name, opa *)
 
     let of_coq reify op =
       Hashtbl.find reify.tbl op
@@ -723,7 +736,8 @@ module Atom =
            let op_smt () =
              (match i with
                 | Index index -> Format.fprintf fmt "op_%i" index
-                | Rel_name name -> Format.fprintf fmt "%s" name);
+                | Rel_name name -> Format.fprintf fmt "%s" name
+                | Rel_name2 (idx,name) -> Format.fprintf fmt "%s" name);
              if pi then to_smt_op op
            in
            if Array.length a = 0 then (
@@ -1367,10 +1381,63 @@ module Atom =
             let tres = SmtBtype.of_coq rt known_logic ty in
             let os = if CoqInterface.isRel c then
                        let i = CoqInterface.destRel c in
+                       (* let _ = Environ.lookup_named i env in *)
                        let n, _ = CoqInterface.destruct_rel_decl (Environ.lookup_rel i env) in
-                       Some (CoqInterface.string_of_name n)
+                       Some (Either.Left(CoqInterface.string_of_name n))
                      else if Vars.closed0 c then
-                       None
+                       (
+                       (* let i = Constr.destVar c in
+                       let n, _ = CoqInterface.destruct_name_decl (Environ.lookup_named i env) in
+                       Some (Names.Id.to_string n) *)
+                       (* assert(Constr.isRef c); *)
+                       (* let _ = Constr.destRef c in *)
+(* let open Names.GlobRef in  *)
+let open Declarations in
+match Constr.kind c with
+  | Constr.Var x -> 
+    (* TODO: generate declare header *)
+    (* correct name *)
+    Some (Either.Right (Names.Id.to_string x))
+    (* None *)
+
+    (* Some "VAR"  *)
+  (* VarRef x, Univ.Instance.empty *)
+
+  (* not used here *)
+  (* | Constr.Const (c,u) -> 
+    Some "Const" *)
+    (* ConstRef c, u *)
+
+    (* for nat, ... *)
+  | Constr.Ind (ind,u) -> 
+    let (mutind,ind_idx) = ind in (* index starts at 0 *)
+    let mind_body = Environ.lookup_mind mutind env in
+    let ind_body = Array.get (mind_body.mind_packets) (ind_idx) in
+
+    let ind_name = ind_body.mind_typename in
+    let x = ind_name in
+
+    Some (Either.Right (Names.Id.to_string x))
+    (* None *)
+
+    (* IndRef ind, u *)
+  | Constr.Construct (c,u) -> 
+      let (ind,con) = c in (* index starts at 1 *)
+      let (mutind,ind_idx) = ind in (* index starts at 0 *)
+
+      let mind_body = Environ.lookup_mind mutind env in
+      let ind_body = Array.get (mind_body.mind_packets) (ind_idx) in
+      let con_name = Array.get (ind_body.mind_consnames) (con-1) in
+
+      let x = con_name in
+
+      Some (Either.Right (Names.Id.to_string x))
+      (* None *)
+    (* ConstructRef c, u *)
+  | _ -> None
+                       (* None *)
+                       )
+                       (* Some "ABC" *)
                      else
                        (* Uninterpreted expression depending on a quantified variable.
                           We do not handle it for the moment.
@@ -1379,6 +1446,7 @@ module Atom =
                        raise UnknownUnderForall
             in
             Op.declare ro c targs tres os
+
         in
         (try
            let (i, _) = destruct "" op in

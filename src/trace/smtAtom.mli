@@ -67,8 +67,11 @@ type nop =
 
 type index = Index of int
            | Rel_name of string
+           | Rel_name2 of int*string
 
 type indexed_op
+
+val index_of_indexed_op: indexed_op -> index
 
 val dummy_indexed_op: index -> btype array -> btype -> indexed_op
 val indexed_op_index : indexed_op -> int
@@ -82,7 +85,7 @@ module Op :
     val create : unit -> reify_tbl
 
     val declare : reify_tbl -> CoqInterface.constr -> btype array ->
-                  btype -> string option -> indexed_op
+                  btype -> ((string,string) Either.t) option -> indexed_op
 
     val of_coq : reify_tbl -> CoqInterface.constr -> indexed_op
 
