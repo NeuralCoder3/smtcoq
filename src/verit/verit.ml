@@ -154,7 +154,8 @@ let export out_channel rt ro lsmt =
     let op_idx = SmtAtom.index_of_indexed_op op in
     let s = 
       match op_idx with
-      | Rel_name n | Rel_name2 (_,n) -> n
+      | Rel_name n -> n
+      | Rel_name2 (i,n) -> "op_"^(string_of_int i)^"_"^n
       | _ -> "op_"^(string_of_int i) in
     SmtMaps.add_fun s op;
     Format.fprintf fmt "(declare-fun %s (" s;
@@ -381,6 +382,8 @@ let import_bool name smt fsmt fproof =
       let t = e in
 
       let lsmt = Form.of_coq (Atom.of_coq rt ro ra verit_logic env sigma) rf t in
+      (* let l = Form.of_coq (Atom.of_coq rt ro ra solver_logic env sigma) rf a in *)
+      (* let _ = Form.of_coq (Atom.of_coq ~eqsym:true rt ro ra_quant verit_logic env sigma) rf_quant t in *)
       let first = lsmt in
       let root = SmtTrace.mkRootV [first] in 
       let roots = [first] in 
@@ -450,6 +453,9 @@ let import_bool name smt fsmt fproof =
   (* let (max_id, confl) = import_trace ra_quant rf_quant fproof None [] in *)
   (* let res = import_trace ra_quant rf_quant logfilename (Some first) lsmt in *)
       SmtCommands.theorem name (rt, ro, ra, rf, roots, max_id, confl)
+      ~transform:(fun body ->
+        CoqInterface.mkLetIn (CoqInterface.mkName "CompDec0", Lazy.force cint63_compdec, CoqInterface.retyping_get_type_of env sigma (Lazy.force cint63_compdec), body)
+        )
       (* ~find:(Some find_lemma) *)
 
       (* SmtCommands.theorem name (rt, ro, ra, rf, root, max_id, confl) *)

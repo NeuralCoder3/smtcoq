@@ -368,7 +368,12 @@ let call_cvc4 env rt ro ra rf root _ =
   ) (SmtBtype.to_list rt);
   
   List.iter (fun (i,cod,dom,op) ->
-    let s = "op_"^(string_of_int i) in
+    let op_idx = SmtAtom.index_of_indexed_op op in
+    let s = 
+      match op_idx with
+      | Rel_name n -> n
+      | Rel_name2 (i,n) -> "op_"^(string_of_int i)^"_"^n
+      | _ -> "op_"^(string_of_int i) in
     SmtMaps.add_fun s op;
     let args =
       Array.fold_right
@@ -417,7 +422,12 @@ let export out_channel rt ro l =
   ) (SmtBtype.to_list rt);
 
   List.iter (fun (i,cod,dom,op) ->
-    let s = "op_"^(string_of_int i) in
+    let op_idx = SmtAtom.index_of_indexed_op op in
+    let s = 
+      match op_idx with
+      | Rel_name n -> n
+      | Rel_name2 (i,n) -> "op_"^(string_of_int i)^"_"^n
+      | _ -> "op_"^(string_of_int i) in
     SmtMaps.add_fun s op;
     fprintf fmt "(declare-fun %s (" s;
     let is_first = ref true in

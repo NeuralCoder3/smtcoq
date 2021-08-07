@@ -183,7 +183,9 @@ let interp_roots t_i roots =
     | [] -> Lazy.force ctrue
     | f::roots -> List.fold_left (fun acc f -> mklApp candb [|acc; interp f|]) (interp f) roots
 
-let theorem ?(find=None) name (rt, ro, ra, rf, roots, max_id, confl) =
+let id x = x
+
+let theorem ?(find=None) ?(transform=id) name (rt, ro, ra, rf, roots, max_id, confl) =
   let nti = CoqInterface.mkName "t_i" in
   let ntfunc = CoqInterface.mkName "t_func" in
   let ntatom = CoqInterface.mkName "t_atom" in
@@ -227,6 +229,7 @@ let theorem ?(find=None) name (rt, ro, ra, rf, roots, max_id, confl) =
   let theorem_concl = mklApp cnot [|mklApp cis_true [|interp_roots t_i roots|]|] in
   let theorem_proof_cast =
     CoqInterface.mkCast (
+        transform(
         CoqInterface.mkLetIn (nti, t_i, mklApp carray [|Lazy.force ctyp_compdec|],
         CoqInterface.mkLetIn (ntfunc, t_func, mklApp carray [|mklApp ctval [|v 1(* t_i *)|]|],
         CoqInterface.mkLetIn (ntatom, t_atom, mklApp carray [|Lazy.force catom|],
@@ -237,11 +240,13 @@ let theorem ?(find=None) name (rt, ro, ra, rf, roots, max_id, confl) =
         mklApp cchecker_correct
                [|v 7 (*t_i*); v 6 (*t_func*); v 5 (*t_atom*); v 4 (*t_form*); v 1 (*d*); v 2 (*used_roots*); v 3 (*c*);
 	         vm_cast_true_no_check
-	           (mklApp cchecker [|v 7 (*t_i*); v 6 (*t_func*); v 5 (*t_atom*); v 4 (*t_form*); v 1 (*d*); v 2 (*used_roots*); v 3 (*c*)|])|]))))))),
+	           (mklApp cchecker [|v 7 (*t_i*); v 6 (*t_func*); v 5 (*t_atom*); v 4 (*t_form*); v 1 (*d*); v 2 (*used_roots*); v 3 (*c*)|])|])))))))
+        ),
         CoqInterface.vmcast,
         theorem_concl)
   in
   let theorem_proof_nocast =
+        transform(
         CoqInterface.mkLetIn (nti, t_i, mklApp carray [|Lazy.force ctyp_compdec|],
         CoqInterface.mkLetIn (ntfunc, t_func, mklApp carray [|mklApp ctval [|v 1(* t_i *)|]|],
         CoqInterface.mkLetIn (ntatom, t_atom, mklApp carray [|Lazy.force catom|],
@@ -251,6 +256,7 @@ let theorem ?(find=None) name (rt, ro, ra, rf, roots, max_id, confl) =
         CoqInterface.mkLetIn (nd, rootsCstr, mklApp carray [|Lazy.force cint|],
         mklApp cchecker_correct
                [|v 7 (*t_i*); v 6 (*t_func*); v 5 (*t_atom*); v 4 (*t_form*); v 1 (*d*); v 2 (*used_roots*); v 3 (*c*)|])))))))
+        )
   in
 
   let ce = CoqInterface.mkTConst theorem_proof_cast theorem_proof_nocast theorem_concl in
@@ -791,7 +797,7 @@ let smt2_id_to_coq_id env t_i ra rf name =
   (* try *)
     let l = String.split_on_char '_' name in
     match l with
-      | ["op"; i] -> vstring_i_id env (int_of_string i)
+      | "op"::i::_ -> vstring_i_id env (int_of_string i)
       | ["@uc"; "Tindex"; i; j] -> sstring_i_id env (int_of_string i) j
       | _ -> raise Not_found
   (* with _ -> (name, 0) *)

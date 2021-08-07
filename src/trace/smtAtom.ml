@@ -737,7 +737,7 @@ module Atom =
              (match i with
                 | Index index -> Format.fprintf fmt "op_%i" index
                 | Rel_name name -> Format.fprintf fmt "%s" name
-                | Rel_name2 (idx,name) -> Format.fprintf fmt "%s" name);
+                | Rel_name2 (idx,name) -> Format.fprintf fmt "op_%i_%s" idx name);
              if pi then to_smt_op op
            in
            if Array.length a = 0 then (

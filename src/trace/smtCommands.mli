@@ -48,6 +48,7 @@ val theorem :
   ?find:(SmtAtom.Form.t SmtCertif.clause ->
                   CoqInterface.types * CoqInterface.constr)
                  option ->
+  ?transform:(CoqInterface.constr -> CoqInterface.constr) ->
   CoqInterface.id ->
   SmtBtype.reify_tbl * SmtAtom.Op.reify_tbl *
   SmtAtom.Atom.reify_tbl * SmtAtom.Form.reify *

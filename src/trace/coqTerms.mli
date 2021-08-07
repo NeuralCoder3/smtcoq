@@ -160,6 +160,7 @@ val cte_compdec : CoqInterface.constr lazy_t
 val ceqb_of_compdec : CoqInterface.constr lazy_t
 val cCompDec : CoqInterface.constr lazy_t
 
+val cint63_compdec : CoqInterface.constr lazy_t
 val cbool_compdec : CoqInterface.constr lazy_t
 val cZ_compdec : CoqInterface.constr lazy_t
 val cPositive_compdec : CoqInterface.constr lazy_t
