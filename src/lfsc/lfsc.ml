@@ -451,7 +451,8 @@ let get_model_from_file filename =
   | _ -> CoqInterface.error "CVC4 returned SAT but no model"
 
 
-let call_cvc4_file env rt ro ra rf root =
+(* let call_cvc4_file env rt ro ra rf root = *)
+let call_cvc4_file env rt ro ra rf root _ =
   let fl = snd root in
   let (filename, outchan) = Filename.open_temp_file "cvc4_coq" ".smt2" in
   export outchan rt ro fl;
@@ -490,9 +491,10 @@ let call_cvc4_file env rt ro ra rf root =
   | Failure s -> CoqInterface.error ("Importing of proof failed: " ^ s)
   | Ast.CVC4Sat ->
     let smodel = get_model_from_file prooffilename in
-    CoqInterface.error
+         raise (SmtCommands.ModelException (env,rt,ro,ra,rf,smodel))
+    (* CoqInterface.error
       ("CVC4 returned sat. Here is the model:\n\n" ^
-       SmtCommands.model_string env rt ro ra rf smodel)
+       SmtCommands.model_string env rt ro ra rf smodel) *)
 
 
 let cvc4_logic = 
@@ -503,6 +505,8 @@ let cvc4_logic =
 (* CoqInterface.econstr_of_constr(Lazy.force ctrue) *)
 
 let tactic_gen ?(gen_model=false) vm_cast =
+  (* let cvc4_call_fun = call_cvc4 in *)
+  let cvc4_call_fun = call_cvc4_file in
   clear_all ();
   let rt = SmtBtype.create () in
   let ro = Op.create () in
@@ -546,9 +550,9 @@ let tactic_gen ?(gen_model=false) vm_cast =
             )
           )
       )
-      call_cvc4 cvc4_logic rt ro ra rf ra' rf' vm_cast [] []
+      cvc4_call_fun cvc4_logic rt ro ra rf ra' rf' vm_cast [] []
     else
-      SmtCommands.tactic call_cvc4 cvc4_logic rt ro ra rf ra' rf' vm_cast [] []
+      SmtCommands.tactic cvc4_call_fun cvc4_logic rt ro ra rf ra' rf' vm_cast [] []
     (* let _ = (rt,ro,ra,rf,ra',rf') in 
     raise Test *)
   (* with e -> 
